@@ -1,0 +1,15 @@
+enum DrawShape {
+  line,
+  linearLine,
+  arrow,
+  dashedLine,
+  diamond,
+  rectangle,
+  circle,
+  triangle,
+  pentagon,
+  hexagon,
+  heptagon,
+  octagon,
+  emoji,
+}

@@ -1,0 +1,1 @@
+enum DrawingModuleType { drawBoard, perfectFreehand }
