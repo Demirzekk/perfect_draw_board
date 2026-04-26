@@ -4,20 +4,28 @@ import '../../perfect_draw_board.dart';
 
 class PerfectDrawBoard extends StatefulWidget {
   final Widget? background;
+  final Widget? child;
   final DrawingState? drawingState;
   final int pageIndex;
   final bool showToolbar;
   final double boardSize;
   final Size? initialImageSize;
+  final DrawingModuleType drawingModuleType;
+  final bool isSpotlightMode;
+  final Offset spotlightPosition;
 
   const PerfectDrawBoard({
     super.key,
     this.background,
+    this.child,
     this.drawingState,
     this.pageIndex = 0,
     this.showToolbar = true,
     this.boardSize = 4000.0,
     this.initialImageSize,
+    this.drawingModuleType = DrawingModuleType.drawBoard,
+    this.isSpotlightMode = false,
+    this.spotlightPosition = Offset.zero,
   });
 
   @override
@@ -138,14 +146,12 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
 
   @override
   Widget build(BuildContext context) {
-    final imageSize = widget.initialImageSize ?? const Size(800, 1200);
-    final imageOrigin = Offset(
-      (widget.boardSize - imageSize.width) / 2,
-      (widget.boardSize - imageSize.height) / 2,
-    );
-
     return Stack(
       children: [
+        if (widget.background != null)
+          Positioned.fill(
+            child: widget.background!,
+          ),
         Listener(
           behavior: HitTestBehavior.translucent,
           onPointerDown: _onPointerDown,
@@ -157,7 +163,7 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
             panEnabled: _isPanMode,
             scaleEnabled: true,
             constrained: false,
-            minScale: 0.1,
+            minScale: 0.05,
             maxScale: 10.0,
             boundaryMargin: const EdgeInsets.all(double.infinity),
             clipBehavior: Clip.none,
@@ -166,22 +172,24 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
               height: widget.boardSize,
               child: Stack(
                 children: [
-                  if (widget.background != null)
-                    Positioned(
-                      left: imageOrigin.dx,
-                      top: imageOrigin.dy,
-                      width: imageSize.width,
-                      height: imageSize.height,
-                      child: widget.background!,
+                  if (widget.child != null)
+                    Positioned.fill(
+                      child: widget.child!,
                     ),
                   Positioned.fill(
                     child: RepaintBoundary(
                       child: CustomPaint(
-                        painter: WorldSpacePainter(
-                          drawingState: _drawingState,
-                          transform: _transformationController,
-                          currentIndex: widget.pageIndex,
-                        ),
+                        painter: widget.drawingModuleType == DrawingModuleType.drawBoard
+                            ? WorldSpacePainter(
+                                drawingState: _drawingState,
+                                transform: _transformationController,
+                                currentIndex: widget.pageIndex,
+                              )
+                            : PerfectFreehandPainter(
+                                drawingState: _drawingState,
+                                transform: _transformationController,
+                                currentIndex: widget.pageIndex,
+                              ),
                       ),
                     ),
                   ),
@@ -190,33 +198,51 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
             ),
           ),
         ),
-        if (widget.showToolbar)
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 24,
-            child: Center(
-              child: PerfectDrawToolbar(
-                isPanMode: _isPanMode,
-                onTogglePanMode: () => setState(() => _isPanMode = !_isPanMode),
-                selectedShape: _selectedShape,
-                onShapeChanged: (val) => setState(() => _selectedShape = val),
-                selectedColor: _selectedColor,
-                onColorChanged: (val) => setState(() => _selectedColor = val),
-                strokeWidth: _strokeWidth,
-                onStrokeWidthChanged: (val) =>
-                    setState(() => _strokeWidth = val),
-                isHighlighter: _isHighlighter,
-                onHighlighterChanged: (val) =>
-                    setState(() => _isHighlighter = val),
-                isEraser: _isEraser,
-                onEraserChanged: (val) => setState(() => _isEraser = val),
-                isLaser: _isLaser,
-                onLaserChanged: (val) => setState(() => _isLaser = val),
-                onUndo: () => _drawingState.undo(widget.pageIndex),
-                onClear: () => _drawingState.clear(widget.pageIndex),
+        if (widget.isSpotlightMode)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: SpotlightPainter(
+                  position: widget.spotlightPosition,
+                ),
               ),
             ),
+          ),
+        if (widget.showToolbar)
+          PerfectDrawToolbar(
+            drawingState: _drawingState,
+            currentIndex: widget.pageIndex,
+            initialIsPanMode: _isPanMode,
+            initialIsEraser: _isEraser,
+            initialIsHighlighter: _isHighlighter,
+            initialIsLaserMode: _isLaser,
+            initialIsSpotlightMode: widget.isSpotlightMode,
+            initialSelectedColor: _selectedColor,
+            initialSelectedShape: _selectedShape,
+            initialStrokeWidth: _strokeWidth,
+            onStateChanged: (
+              isPan,
+              isEra,
+              isHigh,
+              isLaser,
+              isSpot,
+              color,
+              shape,
+              width, {
+              bool isSelect = false,
+              String? emoji,
+            }) {
+              setState(() {
+                _isPanMode = isPan;
+                _isEraser = isEra;
+                _isHighlighter = isHigh;
+                _isLaser = isLaser;
+                _selectedColor = color;
+                _selectedShape = shape;
+                _strokeWidth = width;
+                if (!isSelect) _drawingState.deselectLine();
+              });
+            },
           ),
       ],
     );
