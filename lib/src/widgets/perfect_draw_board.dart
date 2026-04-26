@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'dart:math' as math;
 import '../../perfect_draw_board.dart';
 
 class PerfectDrawBoard extends StatefulWidget {
@@ -13,6 +14,7 @@ class PerfectDrawBoard extends StatefulWidget {
   final DrawingModuleType drawingModuleType;
   final bool isSpotlightMode;
   final Offset spotlightPosition;
+  final Function(bool isPanMode, bool isSelectMode)? onModeChanged;
 
   const PerfectDrawBoard({
     super.key,
@@ -26,13 +28,14 @@ class PerfectDrawBoard extends StatefulWidget {
     this.drawingModuleType = DrawingModuleType.drawBoard,
     this.isSpotlightMode = false,
     this.spotlightPosition = Offset.zero,
+    this.onModeChanged,
   });
 
   @override
-  State<PerfectDrawBoard> createState() => _PerfectDrawBoardState();
+  State<PerfectDrawBoard> createState() => PerfectDrawBoardState();
 }
 
-class _PerfectDrawBoardState extends State<PerfectDrawBoard>
+class PerfectDrawBoardState extends State<PerfectDrawBoard>
     with SingleTickerProviderStateMixin {
   late final DrawingState _drawingState;
   late final TransformationController _transformationController;
@@ -45,6 +48,11 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
   bool _isHighlighter = false;
   bool _isEraser = false;
   bool _isLaser = false;
+  bool _isSelectMode = false;
+  String? _selectedEmoji;
+
+  Offset? _lastSelectDragPoint;
+  bool _isRotatingSelect = false;
 
   int _activePointers = 0;
 
@@ -57,17 +65,20 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _centerView();
+        centerView();
       }
     });
   }
 
-  void _centerView() {
+  void centerView() {
     final size = MediaQuery.of(context).size;
     final imageSize = widget.initialImageSize ?? const Size(800, 1200);
 
-    // Initial scale that fits width-wise with some padding
-    final double initialScale = (size.width / imageSize.width) * 0.85;
+    // Initial scale that fits both width and height with some padding
+    final double scaleX = size.width / imageSize.width;
+    final double scaleY = size.height / imageSize.height;
+    final double initialScale = math.min(scaleX, scaleY) * 0.95;
+
     final double centerX = widget.boardSize / 2;
     final double centerY = widget.boardSize / 2;
 
@@ -79,6 +90,16 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
           Matrix4.diagonal3Values(initialScale, initialScale, 1.0)
             ..setTranslationRaw(tx, ty, 0.0);
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant PerfectDrawBoard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pageIndex != widget.pageIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) centerView();
+      });
+    }
   }
 
   @override
@@ -98,8 +119,64 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
     );
   }
 
+  void setPanMode() {
+    setState(() {
+      _isPanMode = true;
+      _isEraser = false;
+      _isHighlighter = false;
+      _isSelectMode = false;
+      _isLaser = false;
+      widget.onModeChanged?.call(_isPanMode, _isSelectMode);
+    });
+  }
+
+  void setSelectMode() {
+    setState(() {
+      _isSelectMode = !_isSelectMode;
+      if (_isSelectMode) {
+        _isPanMode = false;
+        _isEraser = false;
+        _isHighlighter = false;
+        _isLaser = false;
+      } else {
+        _isPanMode = true;
+      }
+      widget.onModeChanged?.call(_isPanMode, _isSelectMode);
+    });
+  }
+
   void _onPointerDown(PointerDownEvent event) {
     _activePointers++;
+
+    // ── Select Mode ──
+    if (_isSelectMode) {
+      final boardPt = _screenToBoard(event.localPosition);
+      final bounds = _drawingState.getSelectedBounds(widget.pageIndex);
+
+      if (bounds != null) {
+        final inflated = bounds.inflate(8);
+
+        // --- Delete Check ---
+        final deletePos = inflated.topRight + const Offset(5, -5);
+        if ((boardPt - deletePos).distance <= 20) {
+          _drawingState.deleteSelectedLine(widget.pageIndex);
+          return;
+        }
+
+        // --- Rotation Handle Check ---
+        final topCenter = Offset(inflated.center.dx, inflated.top);
+        final handlePos = topCenter + const Offset(0, -30);
+        if ((boardPt - handlePos).distance <= 15) {
+          _isRotatingSelect = true;
+          return;
+        }
+      }
+
+      _drawingState.selectLineAt(boardPt, widget.pageIndex);
+      _lastSelectDragPoint = boardPt;
+      return;
+    }
+
     if (_isPanMode) return;
 
     final boardPt = _screenToBoard(event.localPosition);
@@ -117,12 +194,30 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
         isEraser: _isEraser,
         isHighlighter: _isHighlighter,
         isLaser: _isLaser,
+        emoji: _selectedEmoji,
       ),
       widget.pageIndex,
     );
   }
 
   void _onPointerMove(PointerMoveEvent event) {
+    // ── Select Mode: Sürükleme ──
+    if (_isSelectMode && _drawingState.selectedLineIndex != null) {
+      final boardPt = _screenToBoard(event.localPosition);
+
+      if (_isRotatingSelect) {
+        _drawingState.updateSelectedLinePoint(1, boardPt, widget.pageIndex);
+        return;
+      }
+
+      if (_lastSelectDragPoint != null) {
+        final delta = boardPt - _lastSelectDragPoint!;
+        _drawingState.moveSelectedLine(delta, widget.pageIndex);
+      }
+      _lastSelectDragPoint = boardPt;
+      return;
+    }
+
     if (_isPanMode || _activePointers != 1) return;
     if (_drawingState.currentLine == null) return;
 
@@ -133,7 +228,14 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
   }
 
   void _onPointerUp(PointerUpEvent event) {
+    _isRotatingSelect = false;
     _activePointers = (_activePointers - 1).clamp(0, 10);
+
+    if (_isSelectMode) {
+      _lastSelectDragPoint = null;
+      return;
+    }
+
     if (!_isPanMode && _activePointers == 0) {
       _drawingState.endLine(widget.pageIndex);
     }
@@ -146,6 +248,12 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
 
   @override
   Widget build(BuildContext context) {
+    final imageSize = widget.initialImageSize ?? const Size(800, 1200);
+    final imageOrigin = Offset(
+      (widget.boardSize - imageSize.width) / 2,
+      (widget.boardSize - imageSize.height) / 2,
+    );
+
     return Stack(
       children: [
         if (widget.background != null)
@@ -173,7 +281,11 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
               child: Stack(
                 children: [
                   if (widget.child != null)
-                    Positioned.fill(
+                    Positioned(
+                      left: imageOrigin.dx,
+                      top: imageOrigin.dy,
+                      width: imageSize.width,
+                      height: imageSize.height,
                       child: widget.child!,
                     ),
                   Positioned.fill(
@@ -219,6 +331,7 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
             initialIsHighlighter: _isHighlighter,
             initialIsLaserMode: _isLaser,
             initialIsSpotlightMode: widget.isSpotlightMode,
+            initialIsSelectMode: _isSelectMode,
             initialSelectedColor: _selectedColor,
             initialSelectedShape: _selectedShape,
             initialStrokeWidth: _strokeWidth,
@@ -242,7 +355,10 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
                 _selectedColor = color;
                 _selectedShape = shape;
                 _strokeWidth = width;
+                _selectedEmoji = emoji;
+                _isSelectMode = isSelect;
                 if (!isSelect) _drawingState.deselectLine();
+                widget.onModeChanged?.call(_isPanMode, _isSelectMode);
               });
             },
           ),

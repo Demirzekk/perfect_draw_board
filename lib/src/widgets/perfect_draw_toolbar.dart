@@ -10,6 +10,7 @@ class PerfectDrawToolbar extends StatefulWidget {
   final bool initialIsHighlighter;
   final bool initialIsLaserMode;
   final bool initialIsSpotlightMode;
+  final bool initialIsSelectMode;
   final Color? initialSelectedColor;
   final DrawShape initialSelectedShape;
   final double initialStrokeWidth;
@@ -38,6 +39,7 @@ class PerfectDrawToolbar extends StatefulWidget {
     this.initialIsHighlighter = false,
     this.initialIsLaserMode = false,
     this.initialIsSpotlightMode = false,
+    this.initialIsSelectMode = false,
     this.initialSelectedColor,
     this.initialSelectedShape = DrawShape.line,
     this.initialStrokeWidth = 3.0,
@@ -74,6 +76,7 @@ class PerfectDrawToolbarState extends State<PerfectDrawToolbar> {
     _isHighlighter = widget.initialIsHighlighter;
     _isLaserMode = widget.initialIsLaserMode;
     _isSpotlightMode = widget.initialIsSpotlightMode;
+    _isSelectMode = widget.initialIsSelectMode;
     _selectedColor = widget.initialSelectedColor ?? Colors.blue;
     _selectedShape = widget.initialSelectedShape;
     _strokeWidth = widget.initialStrokeWidth;
@@ -113,7 +116,10 @@ class PerfectDrawToolbarState extends State<PerfectDrawToolbar> {
       _isLaserMode = widget.initialIsLaserMode;
       shouldSetState = true;
     }
-    // Remove initialIsSelectMode checks since it's not passed down
+    if (widget.initialIsSelectMode != oldWidget.initialIsSelectMode) {
+      _isSelectMode = widget.initialIsSelectMode;
+      shouldSetState = true;
+    }
 
     if (shouldSetState && mounted) {
       setState(() {});
@@ -159,6 +165,7 @@ class PerfectDrawToolbarState extends State<PerfectDrawToolbar> {
       isSelect: _isSelectMode,
       emoji: _selectedEmoji,
     );
+    closeToolbar();
   }
 
   bool get _showSecondaryTools =>
@@ -303,6 +310,36 @@ class PerfectDrawToolbarState extends State<PerfectDrawToolbar> {
         _isSelectMode = false;
         _selectedShape = DrawShape.line;
         _strokeWidth = 3.0;
+        _notifyParent();
+      }),
+    ),
+    ToolbarButtonWidget(
+      icon: Icons.open_with_rounded,
+      isActive: _isSelectMode,
+      onTap: () => setState(() {
+        _isSelectMode = !_isSelectMode;
+        if (_isSelectMode) {
+          _isPanMode = false;
+          _isEraser = false;
+          _isHighlighter = false;
+          _isLaserMode = false;
+          _isSpotlightMode = false;
+        } else {
+          _isPanMode = true;
+        }
+        _notifyParent();
+      }),
+    ),
+    ToolbarButtonWidget(
+      icon: Icons.pan_tool,
+      isActive: _isPanMode,
+      onTap: () => setState(() {
+        _isPanMode = true;
+        _isEraser = false;
+        _isHighlighter = false;
+        _isSelectMode = false;
+        _isLaserMode = false;
+        _isSpotlightMode = false;
         _notifyParent();
       }),
     ),
