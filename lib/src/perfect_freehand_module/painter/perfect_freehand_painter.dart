@@ -17,19 +17,22 @@ class PerfectFreehandPainter extends CustomPainter {
   final DrawingState drawingState;
   final TransformationController transform;
   final int currentIndex;
+  final bool applyTransform;
 
   PerfectFreehandPainter({
     required this.drawingState,
     required this.transform,
     required this.currentIndex,
+    this.applyTransform = true,
   }) : super(repaint: Listenable.merge([drawingState, transform]));
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.saveLayer(Offset.zero & size, Paint());
 
-    // Transform board coordinates to screen coordinates
-    // canvas.transform(transform.value.storage);
+    if (applyTransform) {
+      canvas.transform(transform.value.storage);
+    }
 
     final lines = drawingState.pageLines[currentIndex] ?? [];
     for (final line in lines) {
