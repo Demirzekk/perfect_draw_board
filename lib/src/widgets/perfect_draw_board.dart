@@ -184,11 +184,13 @@ class _PerfectDrawBoardState extends State<PerfectDrawBoard>
                                 drawingState: _drawingState,
                                 transform: _transformationController,
                                 currentIndex: widget.pageIndex,
+                                applyTransform: false,
                               )
                             : PerfectFreehandPainter(
                                 drawingState: _drawingState,
                                 transform: _transformationController,
                                 currentIndex: widget.pageIndex,
+                                applyTransform: false,
                               ),
                       ),
                     ),

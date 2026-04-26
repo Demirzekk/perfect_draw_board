@@ -29,7 +29,7 @@ class PerfectFreehandPainter extends CustomPainter {
     canvas.saveLayer(Offset.zero & size, Paint());
 
     // Transform board coordinates to screen coordinates
-    canvas.transform(transform.value.storage);
+    // canvas.transform(transform.value.storage);
 
     final lines = drawingState.pageLines[currentIndex] ?? [];
     for (final line in lines) {

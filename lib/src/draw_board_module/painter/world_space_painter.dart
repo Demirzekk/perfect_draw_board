@@ -23,11 +23,13 @@ class WorldSpacePainter extends CustomPainter {
   final DrawingState drawingState;
   final TransformationController transform;
   final int currentIndex;
+  final bool applyTransform;
 
   WorldSpacePainter({
     required this.drawingState,
     required this.transform,
     required this.currentIndex,
+    this.applyTransform = true,
   }) : super(repaint: Listenable.merge([drawingState, transform]));
 
   @override
@@ -35,8 +37,11 @@ class WorldSpacePainter extends CustomPainter {
     // saveLayer: eraser BlendMode.clear'ın doğru çalışması için zorunlu
     canvas.saveLayer(Offset.zero & size, Paint());
 
-    // Board koordinatlarını → ekran koordinatlarına dönüştür
-    canvas.transform(transform.value.storage);
+    // Eğer CustomPaint, InteractiveViewer'ın DIŞINDAYSA (eski kullanım), transform uygulanmalı.
+    // Eğer İÇİNDEYSE (yeni paket kullanımı), applyTransform false geçilerek bu adım atlanmalı.
+    if (applyTransform) {
+      canvas.transform(transform.value.storage);
+    }
 
     final lines = drawingState.pageLines[currentIndex] ?? [];
     for (final line in lines) {
