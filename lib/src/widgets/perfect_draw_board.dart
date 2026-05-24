@@ -256,10 +256,6 @@ class PerfectDrawBoardState extends State<PerfectDrawBoard>
 
     return Stack(
       children: [
-        if (widget.background != null)
-          Positioned.fill(
-            child: widget.background!,
-          ),
         Listener(
           behavior: HitTestBehavior.translucent,
           onPointerDown: _onPointerDown,
@@ -280,6 +276,8 @@ class PerfectDrawBoardState extends State<PerfectDrawBoard>
               height: widget.boardSize,
               child: Stack(
                 children: [
+                  if (widget.background != null)
+                    Positioned.fill(child: widget.background!),
                   if (widget.child != null)
                     Positioned(
                       left: imageOrigin.dx,
@@ -289,22 +287,20 @@ class PerfectDrawBoardState extends State<PerfectDrawBoard>
                       child: widget.child!,
                     ),
                   Positioned.fill(
-                    child: RepaintBoundary(
-                      child: CustomPaint(
-                        painter: widget.drawingModuleType == DrawingModuleType.drawBoard
-                            ? WorldSpacePainter(
-                                drawingState: _drawingState,
-                                transform: _transformationController,
-                                currentIndex: widget.pageIndex,
-                                applyTransform: false,
-                              )
-                            : PerfectFreehandPainter(
-                                drawingState: _drawingState,
-                                transform: _transformationController,
-                                currentIndex: widget.pageIndex,
-                                applyTransform: false,
-                              ),
-                      ),
+                    child: CustomPaint(
+                      painter: widget.drawingModuleType == DrawingModuleType.drawBoard
+                          ? WorldSpacePainter(
+                              drawingState: _drawingState,
+                              transform: _transformationController,
+                              currentIndex: widget.pageIndex,
+                              applyTransform: false,
+                            )
+                          : PerfectFreehandPainter(
+                              drawingState: _drawingState,
+                              transform: _transformationController,
+                              currentIndex: widget.pageIndex,
+                              applyTransform: false,
+                            ),
                     ),
                   ),
                 ],
